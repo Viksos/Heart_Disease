@@ -1,6 +1,5 @@
 ---
-title: "Projekt wnioskowanie statystyczne"
-subtitle: "Opracowanie zbioru 'Heart Disease'"
+title: "Opracowanie zbioru 'Heart Disease'"
 author: "Michał Dąbrowski"
 date: "29.01.2021"
 output: pdf_document
