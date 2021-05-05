@@ -1,0 +1,298 @@
+---
+title: "Projekt wnioskowanie statystyczne"
+subtitle: "Opracowanie zbioru 'Heart Disease'"
+author: "Michał Dąbrowski, Jan Kaniewski"
+date: "29.01.2021"
+output: pdf_document
+fontsize: 12pt
+---
+
+**Wczytanie bibliotek oraz naszego zbioru danych**
+
+
+```{r, warning = FALSE, message=FALSE}
+library(ggplot2)
+library(ggcorrplot)
+library(dplyr)
+library(readr)
+library(rlang)
+library(gtable)
+library(gridExtra)
+```
+
+# 1. Wprowadzenie 
+
+Heart Disease Data Set - nasz zbiór danych zawiera informacje o 303 pacjentach z Cleveland. Zostali oni przebadani na 14 różnych obszarach. W tym na obecność choroby serca.
+
+Będziemy chcieli bliżej przyjrzeć się zależnościom jakie zachodzą pomiędzy poszczególnymi badanymi cechami, sprawdzić te zależności stawiając odpowiednie hipotezy i ostatecznie wyciągnąć wnioski weryfikując uprzednio postawione hipotezy.
+
+\medskip
+\medskip
+
+link do strony z naszymi danymi:
+
+https://www.kaggle.com/volodymyrgavrysh/heart-disease?fbclid=IwAR26MJ2cssOpSO85W9w3W5cnYKXs3JgWAnhBPMJIuvgZ8hDAxhxlVfxPLQo
+
+\pagebreak
+
+# 2. Przygotowanie danych
+
+Wczytujemy dane i opisujemy kolejne kolumny.
+
+```{r}
+heart <- read.csv("heart.csv")
+
+names(heart) <- c("age", "sex", "cp", "restbp", "chol", "fbs", "restECG",
+                  "maxHR", "exang", "oldpeak", "slope", "ca", "thal", "diagnosis")
+```
+
+
+zmienna     opis
+--------    ----
+`age`       wiek (lata)
+`sex`       płeć (1 - mężczyzna, 0 - kobieta)
+`cp`        ból w klatce (0 - typical, 1 - asymptotic, 2 - nonanginal, 3 - nontypical)
+`restbp`    ciśnienie krwi w spoczynku
+`chol`      serum cholesterol (mg/dl)
+`fbs`       cukier we krwi na czczo (funty)
+`restECG`   wyniki elektrokardiograficzne w spoczynku
+`maxHR`     maksymalne tętno
+`exang`     angina wywołana wysiłkiem fizycznym (1- tak, 0 -nie)
+`oldpeak`   obniżenie odcinka ST podczas wysiku fizycznego
+`slope`     nachylenie szczytowego odcinka ST podczas wysiku fizycznego
+`ca`        ilość naczyń zabarwiona fluoroskopią (0-3)
+`thal`      (3 = normal; 6 = fixed defect; 7 = reversable defect)
+`diagnosis` AHD - diagnoza choroby serca (1 - chory, 0 - zdrowy)
+
+
+\pagebreak
+
+# 3. Eksploracyjna analiza danych
+
+Zacznijmy od przyjrzenia się naszym danym. Sprawdzimy zależności pomiędzy zmiennymi.
+
+
+```{r}
+lapply(heart, summary)
+```
+\medskip
+\medskip
+
+Widzimy, że zakres wiekowy pacjentów, obejmuje od 29 do 77 lat, zatem jest to dość szeroka grupa reprezentacyjan, zawierająca zarówno ludzi młodych (ale nie bardzo młodych!), jak i w starszym wieku. \newline
+
+Widać również, że dane mieszczą się w granicach "normy", tzn. nie ma brakujących wartości jak i wyników szczególnie odstających od reszty. Oznacza to, że zbiór pozbawiony jest luk i błędów, które trzeba by łatać. \newline
+
+Ciekawą obserwacją może być również średnia zmiennej diagnosis, wynosi ona ponad 0.5, co pokazuje, że większość badanych została sklasyfikowana jako chorzy na chorobę serca. \newline
+
+\pagebreak
+Dla lepszego zwizualizowania powiązań pomiędzy danymi stwórzmy "mapę cieplną", która pokaże nam siłę korelacji pomiędzy poszczególnymi cechami. Im mocniej wpadający kolor czerwień lub niebieski, tym mocniejsza korelacja. Natomiast im bledszy odcień kolorów tym słabsza zależność. 
+
+```{r}
+corr <- cor(heart)
+col<- colorRampPalette(c("blue", "white", "red"))(20)
+heatmap(x = corr, col = col, symm = TRUE)
+```
+\pagebreak
+
+Z powyższej "mapy ciepła" możemy wywnioskować, że dobrą korelacją charakteryzują się zmienne age, maxHR, slope, restbp, oldpeak. Zbadajmy je za pomocą wykresów. Osoby chore i zdrowe odróżniać będziemy na podstawie koloru czerwonego i czarnego. \newline
+
+```{r}
+data <- read_csv("heart.csv", col_types = cols(sex=col_factor(), cp=col_factor(), 
+                                               fbs=col_factor(), restecg=col_factor(), 
+                                               slope=col_factor(), exang=col_factor(), 
+                                               ca=col_factor(), thal=col_factor(), 
+                                               target=col_factor()
+                                               ))
+
+options(repr.plot.width = 14, repr.plot.height = 8)
+
+select(data, c(age, thalach, slope, trestbps, oldpeak)) %>% plot(col=data$target)
+```
+\bigskip
+
+Przyjrzyjmy się bliżej tym zależnościom, które wydały nam się ciekawe. Stworzymy odpowiednie wykresy.
+
+\pagebreak
+
+**1. Rozkład *oldpeak* względem wieku, z zaznaczeniem pacjentów zdiagnozowanych na posidanie choroby serca.**
+
+```{r}
+Stan_zdrowia <-ifelse(heart[,'diagnosis']==1, 'chory', 'zdrowy')
+
+ggplot(heart, aes(x = age, y = oldpeak, col = Stan_zdrowia))+
+  geom_point()+labs(x = "Wiek")
+```
+
+Pierwszym, co rzuca się w oczy jest duża ilość "niebieskich kropek" w górnej części wykresu i duża ilość czerwonych u dołu wykresu. Pozwala to wysnuć podejrzenie, że występowanie obniżenia odcinka ST w trakcie wysiłku fizycznego ma wpływ na występowanie choroby serca. Kolejnym nasuwającym się wnioskiem jest to, że wiek nie ma wpływu na występowanie choroby, wygląda na to, że młodzi chorują równie często jak starzy.
+
+\pagebreak
+
+**2. Rozkład maksymalnego ciśnienia względem wieku, z zaznaczeniem pacjentów zdiagnozowanych pozytywnie na posidanie choroby serca.**
+
+```{r}
+ggplot(heart, aes(x = age, y = maxHR, col = Stan_zdrowia))+
+  geom_point()+labs(x = "Wiek")+labs(y = 'Maksymalne ciśnienie')
+```
+W tym wypadku widać wyraźnie, że posiadanie wysokiego ciśnienia maksymalnego jest silnie powiązane ze stanem zdrowia, lecz niekoniecznie z wiekiem.
+
+\pagebreak
+
+**3. Ból w klatce w zależności od wieku z podziałem na 0 - osoby chore i 1 - osoby zdrowe oraz z uwzględnieniem płci.**
+
+```{r, warning = FALSE, message=FALSE}
+plec <-ifelse(heart[,'sex']==1,"mężczyzna", "kobieta")
+
+
+ggplot(heart, aes(x = cp, y = age, color=plec)) +
+  geom_point() +
+  facet_wrap( ~ diagnosis)+
+  scale_x_discrete(limits = c(0, 1, 2, 3), labels=c("typical"," asymptotic"," nonanginal","nontypical")) +
+  
+  theme(axis.text.x = element_text(angle=60, hjust=1)) +
+  labs(x = "Ból w klatce")+labs(y = 'Wiek')
+```
+
+Wnioski:
+\begin{itemize}
+\item Częściej chorują kobiety, niż mężczyźni.
+\item Osoby posiadające typowy ból w klatce rzadziej chorują na serce.
+\item Kobiety posiadające ból nie dławicowy(nonanginal) częściej są diagnozowane jako chore, niż mężczyźni
+\item Wraz z wiekiem chorują coraz częściej kobiety niż mężczyźni.
+\end{itemize}
+
+
+# 4. Stawianie hipotez
+
+**Na podstawie analizy danych i wyciągniętych wniosków postawimy kilka ciekawych hipotez, które następnie postarmy się zweryfikować**
+
+\begin{enumerate}
+\item Ciśnienie w spoczynku zależy od wieku i płci.
+\item Można z dużą dozą pewności stwierdzić, na podstawie wieku oraz objawów bólu w klatce piersiowej, czy pacjent jest chory na serce.
+\item Choroby serca zależą od bólu w klatce i oldpeak.
+\end{enumerate}
+
+\pagebreak
+
+# 5. Tworzenie i dopasowywanie modeli
+**Zacznijmu od weryfikacji hipotezy 1. Czy ciśnienie w spoczynku zależy od wieku i płci**
+
+Spójrzmy jak prezentują się wykresy zależności maksymalnego ciśnienia od wieku i płci (oddzielnie).
+
+```{r}
+plot1 <- ggplot(heart, aes(x = age, y = maxHR))+
+  geom_point()+labs(x = "Wiek")+labs(y = 'Maksymalne ciśnienie')
+
+plot2 <- ggplot(heart, aes(x = plec, y = maxHR))+
+  geom_point()+labs(x = "Płeć")+labs(y = 'Maksymalne ciśnienie')
+
+grid.arrange(plot1, plot2, ncol=2)
+```
+
+Na pierwszy rzut oka nie widać szczególnie wyraźnych zależności tak od wieku jak od płci. Można powiedzieć, że widać delikatny trend spadkowy maksymalnego ciśnienia im pacjent był starszy. Widać również, że zarówno najwyższe i najniższe poziomy ciśnienia przypadają na mężczyzn. Sprawdźmy zatem estymacje za pomocą modelu liniowego.
+
+
+```{r}
+model <- lm(restbp ~ age + sex, data = heart)
+summary(model)
+```
+I faktycznie widzimy, że nie ma wyraźnego wzrostu ciśnienia maksymalnego z wiekem, zaledwie o 0.5338. Natomiast w przypadku płci widzimy wysokie p-value tej cechy, nie możemy uznać jej za istotnej statystycznie. Spróbujmy zatem dopasować model na podstawie samej płci, żeby wykluczyć ewentualną zależność pomiędzy wiekiem i płcią (choć na logikę wydawać się by mogło, że taka zależność nie będzie występować).
+
+\pagebreak
+
+```{r}
+model <- lm(restbp ~ sex, data = heart)
+summary(model)
+```
+Również bardzo wysokie p-value, oznacza to, że płeć jest bardzo słabym predyktorem maksymalnego ciśnienia w spoczynku.
+
+
+Podsumowując nasza hipoteza okazała się fałszywa i nie da się przewidzieć maksymalnego ciśnienia na podstawie ani płci ani wieku.
+
+\pagebreak
+
+**Teraz sprawdźmy 2. Czy na podstawie wieku i bólu w klatce piersiowej można stwierdzić, że pacjent jest chory na serce**
+
+Sprawdźmy jak wygląda zależność pomiędzy naszymi cechami.
+
+```{r}
+heart <- heart %>% mutate(cp = factor(cp, levels = c('typical' = 0, 'asymptotic' = 1, 'nonanginal' = 2, 'nontypical' = 3), labels = c('typical', 'asymptotic', 'nonanginal', 'nontypical')))
+ggplot(heart %>% filter(!is.na(cp)), aes(x = cp, y = age)) + geom_boxplot(notch = TRUE)
+```
+Widzimy, że zmienne nie są mocno zależne, sprawdźmy jakie wyniki dostaniemy z dopasowywania modeli.
+
+Zacznijmy od dopasowania modeli diagnzoy na podstawie każdej z tych cech pojedynczo.
+
+```{r}
+model2 <- lm(diagnosis ~ cp, data = heart)
+model1 <- lm(diagnosis ~ age, data = heart)
+summary(model2)
+summary(model1)
+```
+Widzimy, że w przypadku bólu w klatce błąd standardowy wynosi 0.45, natomiast w przypadku wieku wynosi on 0.4868. Na podstawie współczynnika $r^2$ widzimy, że ból w klatce "wyjaśnia" około 19% wariancji choroby serca, natomiast wiek "wyjaśnia" tylko 5%.
+
+Spróbujmy zatem stworzyć model, który uwzględnia dwie te cechy jendocześnie.
+
+```{r}
+model3 <- lm(diagnosis ~ cp + age, data = heart)
+summary(model3)
+```
+
+Model dopasowany jest lepiej niż dla pojedynczych cech, widzimy, że "wyjaśnia" aż 22% wariancji diagnozy choroby serca. Tak duży wzrost potwierdza wcześniejszy wykres mówiący, że ból w klatce piersiowej nie jest mocno zależny od wieku, więc nasze zmienne niejako współpracują zamiast się wzajemnie duplikować.
+
+Widzimy, że wzrost o 1 stopnień skali bólu zwiększa prawdopodobieństwo pozytywnej diagnozy o 20%. Natomiast, co ciekawe wzrost wieku (przy takim samym bólu), obniża prawdopodobieństwo pozytywnej diagnozy o 1%.
+
+Potwierdza to naszą hipotezę, że zarówno wiek jak i ból w klatce są istotnymi predyktorami dla diagnozy choroby serca.
+
+\pagebreak
+
+**I ostatnia została nam ocena prawdziwości stwierdzenia 3. Czy choroby serca zależą od bólu w klatce i oldpeak**
+
+Sprawdzmy najpierw czy nasze dane są zależne.
+
+```{r,echo=FALSE}
+heart <- read.csv("heart.csv")
+
+names(heart) <- c("age", "sex", "cp", "restbp", "chol", "fbs", "restECG",
+                  "maxHR", "exang", "oldpeak", "slope", "ca", "thal", "diagnosis")
+```
+
+```{r}
+heart <- heart %>% mutate(cp = factor(cp, levels = c('typical' = 0, 'asymptotic' = 1, 'nonanginal' = 2, 'nontypical' = 3), labels = c('typical', 'asymptotic', 'nonanginal', 'nontypical')))
+ggplot(heart %>% filter(!is.na(cp)), aes(x = cp, y = oldpeak)) + geom_boxplot(notch = TRUE)
+```
+Widzimy, że dane są bardzo słabo zależne.
+Zbadajmy teraz w jakim stopniu ból w klatce i obniżenie odcinka ST może przewidzieć diagnozę.\newline
+Zbadajmy najpierw model diagnozy od bólu w klatce.
+
+```{r,echo = FALSE}
+model1 <- lm(diagnosis ~ cp, data = heart)
+summary(model1)
+```
+Widać, że może on przewidzieć około 26 % wariancji choroby serca.\newline
+Teraz zbadajmy model diagnozy od oldpeak.
+
+```{r,echo= FALSE}
+model1 <- lm(diagnosis~oldpeak, data = heart)
+summary(model1)
+```
+Natomiast ten model "wyjaśnia" około 18% wariancji choroby serca.\newline
+Zobaczmy więc na ile skuteczne okaże się model dopasowany tych zmiennych.
+```{r,echo = FALSE}
+model3 <- lm(diagnosis ~ cp + oldpeak, data = heart)
+summary(model3)
+```
+Jak widać ten model może "wyjaśnić" nawet 35 % wariancji choroby serca.
+
+```{r}
+plot(model3,which = 1)
+```
+Jednak ten model nie jest idealny ponieważ powyższy wykres reszt od wartości dopasowanych ukazuje, że modelowi brakuje wciąż pewnych dodatkowych czynników by dobrze przewidzieć dobrą diagnozę. 
+
+```{r}
+plot(model3,which = 2)
+```
+Na szczęscie model zyskuję gdy spojrzymy na wykres Q-Q. Widzimy, że nasz model ma rozkład zbliżony do rozkładu normalnego.\newline
+Możeny więc powiedzieć, że cp i oldpeak są ważnnymi czynnikami determinującymi diagnozę choroby serca. 
+
+# 6. Wnioski
+Przewidywanie poszczególnych parametrów zdrowotnych nie jest łatwe i na podstawie powyższych modeli nie jesteśmy w stanie tego przewidywać. Jednak nasz modele doskonale nadają się do weryfikowania hipotez czy jakiś czynnik wpływa bardziej bądź mniej na prawdopodobieństwo wykrycia choroby. Może być to bardzo przydatna wiedza, gdy należy szybko zdiagnozować czy daną osobę należy dalej dokładniej przebadać.\newline
