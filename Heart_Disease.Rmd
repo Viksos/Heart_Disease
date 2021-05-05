@@ -1,7 +1,7 @@
 ---
 title: "Projekt wnioskowanie statystyczne"
 subtitle: "Opracowanie zbioru 'Heart Disease'"
-author: "Michał Dąbrowski, Jan Kaniewski"
+author: "Michał Dąbrowski"
 date: "29.01.2021"
 output: pdf_document
 fontsize: 12pt
